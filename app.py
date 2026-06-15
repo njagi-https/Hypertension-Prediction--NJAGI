@@ -214,11 +214,10 @@ def predict_hypertension(input_df):
         # Reorder columns to match training data
         input_ordered = input_df[feature_names]
         
-        # Patch the specific instance if the class patch didn't work
+        # Patch the imputer instance if needed
         if not hasattr(global_imputer, '_fill_dtype'):
-            def _fill_dtype(self, dtype):
-                return dtype
-            global_imputer._fill_dtype = types.MethodType(_fill_dtype, global_imputer)
+            import numpy as np
+            global_imputer._fill_dtype = np.float64
 
         input_imputed = global_imputer.transform(input_ordered)
         input_clean = pd.DataFrame(input_imputed, columns=feature_names)
@@ -233,7 +232,8 @@ def predict_hypertension(input_df):
     except Exception as e:
         st.error(f"Preprocessing error: {e}")
         return None
-
+    
+    # ... rest of the function remains the same
     # 2. Predict with each model
     for name, model in models.items():
         try:
