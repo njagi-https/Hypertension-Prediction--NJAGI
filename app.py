@@ -215,16 +215,15 @@ def predict_hypertension(input_df):
         input_ordered = input_df[feature_names]
         
         # Patch the imputer instance if needed
-       if hasattr(global_imputer, '_fill_dtype'):
-    if callable(global_imputer._fill_dtype):
-        global_imputer._fill_dtype = np.float64
+        if not hasattr(global_imputer, '_fill_dtype'):
+            import numpy as np
+            global_imputer._fill_dtype = np.float64
 
         input_imputed = global_imputer.transform(input_ordered)
         input_clean = pd.DataFrame(input_imputed, columns=feature_names)
     except AttributeError as e:
         if "_fill_dtype" in str(e):
-            st.warning("⚠️ Imputer version mismatch detected. Applying fallback imputation (filling missing values with 0).")
-            # Fallback: 0 is the mathematical mean for centered features
+            st.warning("⚠️ Imputer version mismatch detected. Applying fallback imputation.")
             input_clean = input_ordered.fillna(0)
         else:
             st.error(f"Preprocessing error: {e}")
@@ -232,20 +231,16 @@ def predict_hypertension(input_df):
     except Exception as e:
         st.error(f"Preprocessing error: {e}")
         return None
-    
-    # ... rest of the function remains the same
+
     # 2. Predict with each model
     for name, model in models.items():
         try:
             pred_class = model.predict(input_clean)[0]
             
-            # Handle models that may not have predict_proba
             if hasattr(model, 'predict_proba'):
                 proba = model.predict_proba(input_clean)[0]
-                # Get probability of positive class (index 1)
                 pred_prob = proba[1] if len(proba) > 1 else proba[0]
             else:
-                # Fallback for models without predict_proba
                 pred_prob = float(pred_class)
             
             results[name] = {
