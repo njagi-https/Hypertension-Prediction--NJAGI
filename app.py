@@ -44,7 +44,7 @@ def patch_sklearn_pickle():
         
         if not hasattr(SimpleImputer, '_fill_dtype'):
             def _fill_dtype(self, dtype):
-                return dtype
+                return np.float64
             SimpleImputer._fill_dtype = _fill_dtype
             print("⚠️ Patched SimpleImputer._fill_dtype at class level")
     except Exception as e:
