@@ -215,9 +215,9 @@ def predict_hypertension(input_df):
         input_ordered = input_df[feature_names]
         
         # Patch the imputer instance if needed
-        if not hasattr(global_imputer, '_fill_dtype'):
-            import numpy as np
-            global_imputer._fill_dtype = np.float64
+       if hasattr(global_imputer, '_fill_dtype'):
+    if callable(global_imputer._fill_dtype):
+        global_imputer._fill_dtype = np.float64
 
         input_imputed = global_imputer.transform(input_ordered)
         input_clean = pd.DataFrame(input_imputed, columns=feature_names)
