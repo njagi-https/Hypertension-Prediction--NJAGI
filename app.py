@@ -8,6 +8,7 @@ from plotly.subplots import make_subplots
 import os
 import sys
 import warnings
+import types
 
 # Suppress warnings for cleaner UI
 warnings.filterwarnings('ignore')
@@ -20,15 +21,14 @@ def patch_sklearn_pickle():
     Creates dummy classes for missing sklearn internal structures 
     to allow loading of pickles from different sklearn versions.
     """
+    # Patch ColumnTransformer
     try:
         import sklearn.compose._column_transformer as ct_module
         
-        # List of known internal classes that might cause issues across versions
         missing_classes = ['_RemainderColsList', '_ColumnTransformer']
         
         for cls_name in missing_classes:
             if not hasattr(ct_module, cls_name):
-                # Create a generic class that inherits from list or object
                 class DummyClass(list):
                     def __init__(self, *args, **kwargs):
                         super().__init__(*args, **kwargs)
@@ -36,7 +36,19 @@ def patch_sklearn_pickle():
                 setattr(ct_module, cls_name, DummyClass)
                 print(f"⚠️ Patched missing class: {cls_name}")
     except Exception as e:
-        print(f"Note: Could not apply pickle patch: {e}")
+        print(f"Note: Could not apply pickle patch for ColumnTransformer: {e}")
+
+    # Patch SimpleImputer for _fill_dtype issue
+    try:
+        from sklearn.impute import SimpleImputer
+        
+        if not hasattr(SimpleImputer, '_fill_dtype'):
+            def _fill_dtype(self, dtype):
+                return dtype
+            SimpleImputer._fill_dtype = _fill_dtype
+            print("⚠️ Patched SimpleImputer._fill_dtype at class level")
+    except Exception as e:
+        print(f"Note: Could not patch SimpleImputer: {e}")
 
 patch_sklearn_pickle()
 
@@ -201,8 +213,23 @@ def predict_hypertension(input_df):
     try:
         # Reorder columns to match training data
         input_ordered = input_df[feature_names]
+        
+        # Patch the specific instance if the class patch didn't work
+        if not hasattr(global_imputer, '_fill_dtype'):
+            def _fill_dtype(self, dtype):
+                return dtype
+            global_imputer._fill_dtype = types.MethodType(_fill_dtype, global_imputer)
+
         input_imputed = global_imputer.transform(input_ordered)
         input_clean = pd.DataFrame(input_imputed, columns=feature_names)
+    except AttributeError as e:
+        if "_fill_dtype" in str(e):
+            st.warning("⚠️ Imputer version mismatch detected. Applying fallback imputation (filling missing values with 0).")
+            # Fallback: 0 is the mathematical mean for centered features
+            input_clean = input_ordered.fillna(0)
+        else:
+            st.error(f"Preprocessing error: {e}")
+            return None
     except Exception as e:
         st.error(f"Preprocessing error: {e}")
         return None
